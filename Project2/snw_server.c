@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
-
+#include "program3Functions.h"
 
 
 #define MAX_LINE 4096
@@ -19,6 +19,7 @@ int bind_and_listen( const char *service );
 int main( int argc, char *argv[] ) {
 	char* port_number;
 	char buf[MAX_LINE];
+	char temp_buf[MAX_LINE];
 	int s, new_s;
 	int len = 0;
    	char *fileName;
@@ -45,27 +46,27 @@ int main( int argc, char *argv[] ) {
                     close( s );
                     exit( 1 );
             }
-            len = recv( new_s, buf, sizeof( buf ), 0 ) ; 
+            len = receiveAndVerifyFilename( new_s, buf) ; 
             fileName = buf;
             printf("%s\n", buf);
 		    //close( new_s );
 		    break;
         }
-	struct stat fileStat;
-	if(stat(buf, &fileStat) < 0){
-        send(new_s, error, strlen(error),0);
-        close(new_s);
-		close(s);
-		return 0;
-	}
 	fptr = fopen(fileName, "r");
 	memset(buf, 0 , sizeof(buf));
 	int byte_size = 0;
 	int fd = fileno(fptr);
-	
-	while((byte_size = read(fd, buf, sizeof(buf))) > 0){
-		send(new_s, buf, byte_size, 0);
+	int seq =  42;
+	while((byte_size = read(fd, temp_buf, sizeof(temp_buf))) > 0){
+		memcpy(&buf[0], &seq, sizeof(char)*4);
+		memcpy(&buf[4], &temp_buf, sizeof(temp_buf));
+		printf("buf:%s\n", buf); 
+		packetErrorSend(new_s, buf, byte_size + 4, 0);
 		memset(buf, 0 , sizeof(buf));
+		// select 50ms
+		// 	if(ack recv)
+		// 	resend (no ack)
+		// 	or go on and iterate seq #
 	}	
 
 	close(new_s);

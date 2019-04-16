@@ -5,6 +5,8 @@
 #include <netdb.h>
 #include <string.h>
 #include <unistd.h>
+#include "program3Functions.h"
+
 
 #define MAX_LINE 4096
 
@@ -37,7 +39,7 @@ int main( int argc, char *argv[] ) {
     if ( ( s = lookup_and_connect( host, port_number) ) < 0 ) {
         	exit( 1 );
     }
-    if ( send( s, file_name, strlen(file_name), 0 ) == -1 ) {
+    if ( deliverFilename( s, file_name) == -1 ) {
     		perror( "stream-talk-client: send" );
        		close( s );
         	exit( 1 );
@@ -50,9 +52,10 @@ int main( int argc, char *argv[] ) {
     }
 	fptr = fopen(file_name, "w");
 	int fd = fileno(fptr);
-    write(fd, buf, bytes_recv);
-    memset(buf, 0, sizeof(buf));
+    	write(fd, buf, bytes_recv);
+    	memset(buf, 0, sizeof(buf));
 	while((bytes_recv = recv(s, buf, sizeof(buf), 0)) > 0){
+		printf("buf:%s\n", buf);
 		write(fd, buf, bytes_recv);
 		memset(buf, 0, sizeof(buf));
 	}	
