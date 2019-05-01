@@ -9,7 +9,7 @@
 #include "program3Functions.h"
 
 
-#define MAX_LINE 4096
+#define MAX_LINE 1396
 
 int lookup_and_connect( const char *host, const char *service );
 
@@ -20,10 +20,9 @@ int main( int argc, char *argv[] ) {
 	char* file_name;
 	char buf[MAX_LINE];
   int s;
-  char Errorcheck[MAX_LINE] = "Server error";
 	FILE *fptr;
   int bytes_recv = 0;
-
+  int seq[1] = {0};
 	if ( argc == 4 ) {
   	host = argv[1];
 		port_number = argv[2];
@@ -38,20 +37,37 @@ int main( int argc, char *argv[] ) {
   if ( ( s = lookup_and_connect( host, port_number) ) < 0 ) {
     exit( 1 );
   }
-  if ( deliverFilename( s, file_name) == -1 ) {
+  int errorNumber = 0;
+  if ( (errorNumber = deliverFilename( s, file_name)) == -1 ) {
   	perror( "stream-talk-client: send" );
   	close( s );
     exit( 1 );
   }
+  if(errorNumber == -2){
+	  perror("FILE DOES NOT EXIST");
+	  close(s);
+	  return 0;
+  }
+  
 
 	fptr = fopen(file_name, "w");
 	int fd = fileno(fptr);
-  memset(buf, 0, sizeof(buf));
-	while((bytes_recv = recv(s, buf, sizeof(buf), 0)) > 0){
-		printf("buf:%s\n", buf);
-		write(fd, buf, bytes_recv);
-		memset(buf, 0, sizeof(buf));
+	while((bytes_recv = recv(s, buf, sizeof(buf), 0)) > 0 ){
+		if(buf[0] == seq[0]){
+            		write(fd, buf + sizeof(seq[0]), bytes_recv - sizeof(buf[0]));
+            		memcpy(buf, seq, sizeof(seq));
+            		packetErrorSend(s, seq, sizeof(seq), 0);
+	    		seq[0]++;
+	    		if(seq[0] == 10){
+		    		seq[0] = 0;
+	    		}
+        	}
+        	else{
+	    		packetErrorSend(s, seq, sizeof(seq), 0);
+        	}
 	}
+    	close(fd);
+    	close(s);
 	return 0;
 }
 
