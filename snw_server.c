@@ -8,11 +8,10 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include "program3Functions.h"
+#include <stdbool.h>
 
-
-#define MAX_LINE 4096
+#define MAX_LINE 1396
 #define MAX_PENDING 5
-
 
 
 int bind_and_listen( const char *service );
@@ -20,72 +19,82 @@ int bind_and_listen( const char *service );
 int main( int argc, char *argv[] ) {
 	char* port_number;
 	char buf[MAX_LINE];
-	char temp_buf[MAX_LINE];
+	//char temp_buf[MAX_LINE];
 	int s, new_s;
 	int len = 0;
-  char *fileName;
+  	char *fileName;
 	FILE *fptr;
-  char* error = "Server error";
 	fd_set rfds;
 	struct timeval tv;
 	int retval;
 
-  memset(buf, 0, sizeof(buf));
+  	memset(buf, 0, sizeof(buf));
 	if(argc == 2){
 		port_number = argv[1];
 	}
 
     /* Bind socket to local interface and passive open */
-  if ( ( s = bind_and_listen( port_number ) ) < 0 ) {
+  	if ( ( s = bind_and_listen( port_number ) ) < 0 ) {
                 exit( 1 );
-  }
-  while ( 1 ) {
-    if ( ( new_s = accept( s, NULL, NULL ) ) < 0 ) {
-      perror( "stream-talk-server: accept" );
-      close( s );
-      exit( 1 );
-    }
-    if ( len < 0 ) {
-      perror( "streak-talk-server: recv" );
-      close( s );
-      exit( 1 );
-    }
-    len = receiveAndVerifyFilename( new_s, buf) ;
-    fileName = buf;
-    printf("%s\n", buf);
-	  //close( new_s );
+  	}
+  	while ( 1 ) {
+    		if ( ( new_s = accept( s, NULL, NULL ) ) < 0 ) {
+      			perror( "stream-talk-server: accept" );
+      			close( s );
+      			exit( 1 );
+    		}
+    		if ( len < 0 ) {
+      			perror( "streak-talk-server: recv" );
+      			close( s );
+      			exit( 1 );
+    		}
+    		len = receiveAndVerifyFilename( new_s, buf) ;
+    		fileName = buf;
+    		printf("%s\n", buf);
 		break;
-  }
+  	}
 	fptr = fopen(fileName, "r");
 	memset(buf, 0 , sizeof(buf));
 	int byte_size = 0;
 	int fd = fileno(fptr);
-	int seq =  42;
+	int seq[1] = {0};
 
 	FD_ZERO(&rfds);
 	FD_SET(new_s, &rfds);
-
-	while((byte_size = read(fd, temp_buf, MAX_LINE - 4)) > 0){
-		memcpy(&buf[0], &seq, sizeof(char)*4);
-		memcpy(&buf[4], &temp_buf, byte_size);
-		printf("buf:%s\n", buf);
-		packetErrorSend(new_s, buf, byte_size + 4, 0);
-		memset(buf, 0 , sizeof(buf));
-
-		tv.tv_sec = 0;
-		tv.tv_usec = 50;
-
-		retval = select(new_s + 1, &rfds, NULL, NULL, &tv);
-		if(retval == -1) {
-			perror("select()");
-		} else if (retval) {
-			printf("Data Recieved\n");
-			seq++;
-		} else {
-			printf("No data within 50 milliseconds\n");
+	bool checker = true;
+	memcpy(buf, seq, sizeof(seq));
+	while((byte_size = read(fd, buf + sizeof(seq[0]), sizeof(buf) - sizeof(buf[0])))){
+		while(checker){
+			FD_ZERO(&rfds);
+			FD_SET(new_s, &rfds);
+			tv.tv_sec = 0;
+			tv.tv_usec = 50000;
+			packetErrorSend(new_s, buf, byte_size + sizeof(buf[0]), 0);
+        		while((retval = select(new_s + 1, &rfds, NULL, NULL, &tv)) == 0){
+        			if(retval == -1){
+			    		perror("select()");
+				}else {
+					FD_ZERO(&rfds);
+					FD_SET(new_s, &rfds);
+					tv.tv_sec = 0;
+					tv.tv_usec = 50000;
+                			packetErrorSend(new_s, buf, byte_size + sizeof(buf[0]), 0);
+				}
+			
+			}
+			recv(new_s, buf, sizeof(buf), 0);
+			if(buf[0] == seq[0]){
+				seq[0]++;
+				memcpy(buf, seq, sizeof(seq));
+				checker = false;
+				if(seq[0] == 10){
+					seq[0] = 0;
+				}
+			}
 		}
-	}
-
+		checker = true;
+        }
+		
 	close(new_s);
 	close(s);
 	return 0;
